@@ -1,153 +1,163 @@
 package com.example;
 
-import net.sourceforge.tess4j.ITesseract;
-import net.sourceforge.tess4j.Tesseract;
-import net.sourceforge.tess4j.TesseractException;
-
 import javax.swing.*;
-
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.InputEvent;
-import java.awt.image.BufferedImage;
+import java.awt.event.*;
 
-public class AutoTraderBotApp extends JFrame {
+public class AutoTraderBotApp {
 
-    private JTextField buyPriceField, sellPriceField;
-    private JTextField buyXField, buyYField, sellXField, sellYField;
-    private JTextField priceAreaXField, priceAreaYField, priceAreaWidthField, priceAreaHeightField;
-    private JButton startButton, stopButton;
+    private static double buyPrice;
+    private static double sellPrice;
+    private static boolean isBotRunning = false;
+    private static Point buyButtonLocation = null;
+    private static Point sellButtonLocation = null;
 
-    private volatile boolean running = false;
+    // Labels para exibir as coordenadas
+    private static JLabel buyCoordinatesLabel = new JLabel("Coordenada de Compra: Não selecionada");
+    private static JLabel sellCoordinatesLabel = new JLabel("Coordenada de Venda: Não selecionada");
 
-    public AutoTraderBotApp() {
-        setTitle("AutoTrader Bot");
-        setSize(400, 500);
-        setDefaultCloseOperation(EXIT_ON_CLOSE);
-        setLocationRelativeTo(null);
-        setLayout(new GridLayout(12, 2, 5, 5));
+    // Instância do MouseAdapter
+    private static MouseAdapter mouseListener;
 
-        // Campos de entrada
-        add(new JLabel("Preço máximo de compra:"));
-        buyPriceField = new JTextField();
-        add(buyPriceField);
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> {
+            JFrame frame = new JFrame("Auto Trader Bot");
+            frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-        add(new JLabel("Preço mínimo de venda:"));
-        sellPriceField = new JTextField();
-        add(sellPriceField);
+            // Labels e TextFields para Preço de Compra e Venda
+            JLabel buyPriceLabel = new JLabel("Preço de Compra:");
+            JTextField buyPriceField = new JTextField(10);
 
-        add(new JLabel("X do botão Comprar:"));
-        buyXField = new JTextField();
-        add(buyXField);
+            JLabel sellPriceLabel = new JLabel("Preço de Venda:");
+            JTextField sellPriceField = new JTextField(10);
 
-        add(new JLabel("Y do botão Comprar:"));
-        buyYField = new JTextField();
-        add(buyYField);
+            // Botão para Iniciar/Parar o Bot
+            JButton startButton = new JButton("Iniciar Bot");
 
-        add(new JLabel("X do botão Vender:"));
-        sellXField = new JTextField();
-        add(sellXField);
+            // ActionListener para o botão de iniciar/parar
+            startButton.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    if (isBotRunning) {
+                        startButton.setText("Iniciar Bot");
+                        stopBot();
+                    } else {
+                        try {
+                            buyPrice = Double.parseDouble(buyPriceField.getText());
+                            sellPrice = Double.parseDouble(sellPriceField.getText());
 
-        add(new JLabel("Y do botão Vender:"));
-        sellYField = new JTextField();
-        add(sellYField);
-
-        add(new JLabel("Área Preço X:"));
-        priceAreaXField = new JTextField();
-        add(priceAreaXField);
-
-        add(new JLabel("Área Preço Y:"));
-        priceAreaYField = new JTextField();
-        add(priceAreaYField);
-
-        add(new JLabel("Área Preço Largura:"));
-        priceAreaWidthField = new JTextField();
-        add(priceAreaWidthField);
-
-        add(new JLabel("Área Preço Altura:"));
-        priceAreaHeightField = new JTextField();
-        add(priceAreaHeightField);
-
-        startButton = new JButton("Iniciar Bot");
-        stopButton = new JButton("Parar Bot");
-
-        add(startButton);
-        add(stopButton);
-
-        startButton.addActionListener(this::startBot);
-        stopButton.addActionListener(this::stopBot);
-
-        setVisible(true);
-    }
-
-    private void startBot(ActionEvent e) {
-        running = true;
-        new Thread(this::botLoop).start();
-    }
-
-    private void stopBot(ActionEvent e) {
-        running = false;
-    }
-
-    private void botLoop() {
-        try {
-            double buyPrice = Double.parseDouble(buyPriceField.getText());
-            double sellPrice = Double.parseDouble(sellPriceField.getText());
-            int buyX = Integer.parseInt(buyXField.getText());
-            int buyY = Integer.parseInt(buyYField.getText());
-            int sellX = Integer.parseInt(sellXField.getText());
-            int sellY = Integer.parseInt(sellYField.getText());
-            int areaX = Integer.parseInt(priceAreaXField.getText());
-            int areaY = Integer.parseInt(priceAreaYField.getText());
-            int areaWidth = Integer.parseInt(priceAreaWidthField.getText());
-            int areaHeight = Integer.parseInt(priceAreaHeightField.getText());
-
-            Robot robot = new Robot();
-            ITesseract tesseract = new Tesseract();
-            tesseract.setDatapath("src/main/resources/tessdata");
-            tesseract.setLanguage("eng");
-
-            Rectangle captureArea = new Rectangle(areaX, areaY, areaWidth, areaHeight);
-            Point buyButton = new Point(buyX, buyY);
-            Point sellButton = new Point(sellX, sellY);
-
-            while (running) {
-                BufferedImage image = robot.createScreenCapture(captureArea);
-                String text = tesseract.doOCR(image);
-                text = text.replaceAll("[^0-9.,]", "").replace(",", ".").trim();
-
-                if (!text.isEmpty()) {
-                    double price = Double.parseDouble(text);
-                    System.out.println("Preço atual: " + price);
-
-                    if (price <= buyPrice) {
-                        System.out.println("Comprando...");
-                        click(robot, buyButton);
-                    } else if (price >= sellPrice) {
-                        System.out.println("Vendendo...");
-                        click(robot, sellButton);
+                            startButton.setText("Parar Bot");
+                            startBot();
+                        } catch (NumberFormatException ex) {
+                            JOptionPane.showMessageDialog(frame, "Por favor, insira valores válidos para os preços.");
+                        }
                     }
-                } else {
-                    System.out.println("Não foi possível ler o preço.");
+                    isBotRunning = !isBotRunning;
                 }
+            });
 
-                Thread.sleep(3000);
+            // Botões para Escolher as Coordenadas (Compra e Venda)
+            JButton setBuyButton = new JButton("Escolher coordenada Compra");
+            JButton setSellButton = new JButton("Escolher coordenada Venda");
+
+            // Ação para escolher coordenada de Compra
+            setBuyButton.addActionListener(e -> chooseCoordinates("comprar"));
+
+            // Ação para escolher coordenada de Venda
+            setSellButton.addActionListener(e -> chooseCoordinates("vender"));
+
+            // Layout da Interface
+            JPanel panel = new JPanel();
+            panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+            panel.add(buyPriceLabel);
+            panel.add(buyPriceField);
+            panel.add(sellPriceLabel);
+            panel.add(sellPriceField);
+            panel.add(startButton);
+            panel.add(setBuyButton);
+            panel.add(setSellButton);
+            panel.add(buyCoordinatesLabel);  // Exibir coordenada de Compra
+            panel.add(sellCoordinatesLabel); // Exibir coordenada de Venda
+
+            frame.getContentPane().add(panel);
+
+            frame.pack();
+            frame.setVisible(true);
+        });
+    }
+
+    // Método para Iniciar o Bot
+    public static void startBot() {
+        System.out.println("Bot iniciado com Preço de Compra: " + buyPrice + " e Preço de Venda: " + sellPrice);
+        if (buyButtonLocation != null && sellButtonLocation != null) {
+            System.out.println("Bot usando as coordenadas de Compra: " + buyButtonLocation + " e Venda: " + sellButtonLocation);
+            try {
+                Robot robot = new Robot();
+
+                // Simula o clique no botão de Compra
+                robot.mouseMove(buyButtonLocation.x, buyButtonLocation.y);
+                robot.mousePress(InputEvent.BUTTON1_DOWN_MASK);
+                robot.mouseRelease(InputEvent.BUTTON1_DOWN_MASK);
+                Thread.sleep(500);  // Atraso de meio segundo
+
+                // Simula o clique no botão de Venda
+                robot.mouseMove(sellButtonLocation.x, sellButtonLocation.y);
+                robot.mousePress(InputEvent.BUTTON1_DOWN_MASK);
+                robot.mouseRelease(InputEvent.BUTTON1_DOWN_MASK);
+                Thread.sleep(500);  // Atraso de meio segundo
+
+                System.out.println("Cliques simulados: Compra e Venda");
+
+            } catch (AWTException | InterruptedException e) {
+                e.printStackTrace();
             }
-
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            JOptionPane.showMessageDialog(this, "Erro: " + ex.getMessage());
         }
     }
 
-    private void click(Robot robot, Point point) throws InterruptedException {
-        robot.mouseMove(point.x, point.y);
-        Thread.sleep(100);
-        robot.mousePress(InputEvent.BUTTON1_DOWN_MASK);
-        robot.mouseRelease(InputEvent.BUTTON1_DOWN_MASK);
+    // Método para Parar o Bot
+    public static void stopBot() {
+        System.out.println("Bot parado.");
+        // Aqui você pode parar qualquer execução do bot, como captura de tela.
     }
 
-    public static void main(String[] args) {
-        SwingUtilities.invokeLater(AutoTraderBotApp::new);
+    // Método para escolher as coordenadas de compra e venda ao clicar na tela globalmente
+    private static void chooseCoordinates(String type) {
+        // Display uma mensagem de instrução
+        JOptionPane.showMessageDialog(null, "Clique na posição desejada na tela. O programa irá capturar a coordenada.");
+
+        // Após fechar a mensagem, permitir captura de coordenadas
+        SwingUtilities.invokeLater(() -> {
+            // Agora aguardamos até que a caixa de diálogo seja fechada
+            new Thread(() -> {
+                try {
+                    Thread.sleep(500); // Aguardar um pequeno tempo para garantir que a caixa foi fechada
+                    // Após isso, permitir captura de coordenadas
+                    mouseListener = new MouseAdapter() {
+                        @Override
+                        public void mouseClicked(MouseEvent e) {
+                            Point mouseLocation = e.getPoint();
+                            if (type.equals("comprar") && buyButtonLocation == null) {
+                                buyButtonLocation = mouseLocation;
+                                buyCoordinatesLabel.setText("Coordenada de Compra: " + mouseLocation);
+                                JOptionPane.showMessageDialog(null, "Localização de Compra selecionada: " + mouseLocation);
+                            } else if (type.equals("vender") && sellButtonLocation == null) {
+                                sellButtonLocation = mouseLocation;
+                                sellCoordinatesLabel.setText("Coordenada de Venda: " + mouseLocation);
+                                JOptionPane.showMessageDialog(null, "Localização de Venda selecionada: " + mouseLocation);
+                            }
+                        }
+                    };
+
+                    // Capturar o clique do mouse, independente de onde for
+                    Toolkit.getDefaultToolkit().addAWTEventListener(e -> {
+                        if (e instanceof MouseEvent) {
+                            mouseListener.mouseClicked((MouseEvent) e);
+                        }
+                    }, AWTEvent.MOUSE_EVENT_MASK);
+                } catch (InterruptedException ex) {
+                    ex.printStackTrace();
+                }
+            }).start();
+        });
     }
 }
